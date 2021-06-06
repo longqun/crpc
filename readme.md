@@ -75,6 +75,7 @@ Note
 2:如果你有请求的数据在body里面，请从controller->get_http_parser()->get_body()获取body中的数据。
 3：获取get请求中的参数暂时不支持。
 ```
+
 ### step3
 ```
 int main()
@@ -94,5 +95,38 @@ Note:
 1:http需要指定路径对应的服务  如 当你请求http://192.168.1.1/v1/echo/ 则会调用到对应的Echo（在proto中定义的）
 ```
 
-## 运行截图如下
-![http.png](img/http.png)
+## 异步rpc使用
+### server使用
+```
+    //proto实现的接口
+    virtual void AsynEcho(::google::protobuf::RpcController* con,
+                       const ::http::HttpRequest* request,
+                       ::http::HttpResponse* response,
+                       ::google::protobuf::Closure* done) {
+
+    wrap_obj *obj = new wrap_obj();
+    obj->con = (ProtoRpcController*)con;
+    obj->done = done;
+
+    pthread_t ntid;
+    int err = pthread_create(&ntid, NULL, thread_out_put, obj);
+  }
+
+  //业务代码
+  void* thread_out_put(void* arg)
+  {
+      pthread_detach(pthread_self());
+      wrap_obj* obj = (wrap_obj*) arg;
+      IoBuf& out_buf = obj->con->get_write_io_buf();
+      /**/
+      out_buf.append(OUT_WORLD, strlen(OUT_WORLD));
+      sleep(2);
+      obj->done->Run();
+      delete obj;
+      return NULL;
+  }
+
+NOTE:
+  1：跟同步接口类似，只需要往对应的数据填充即可，最后调用 done->Run() 方法即可
+```
+
