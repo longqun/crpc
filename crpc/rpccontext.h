@@ -1,5 +1,6 @@
 #ifndef RPCCONTEXT_H
 #define RPCCONTEXT_H
+#include <execinfo.h>
 #include <unordered_map>
 #include <atomic>
 #include <string>
@@ -14,6 +15,7 @@
 #include "crpc_log.h"
 #include "non_copy.h"
 #include "protocol.h"
+#include "event_loop.h"
 
 namespace crpc {
 
@@ -29,28 +31,15 @@ enum
 #define CAN_WRITE(status) !(status & DISABLE_WRITE)
 #define STATUS_ERROR(status) (status & CONTEX_ERROR)
 
-
-class CRpcServer;
-
 class RpcContext : NonCopy
 {
 public:
 
-    RpcContext(int fd, CRpcServer* server);
+    RpcContext(int fd, EventLoop* loop);
 
-    ~RpcContext()
-    {
-         //crpc_log("destroy context %p %d\n", this, _socket.fd());
-        _socket.close();
-        delete _user_data;
-    }
+    ~RpcContext();
 
-    void set_event(uint32_t event)
-    {
-        _event = event;
-    }
-
-    void handle_event();;
+    void handle_event(uint32_t event);;
 
     int fd() const
     {
@@ -74,12 +63,12 @@ public:
 
     void set_context_close()
     {
+        crpc_log("set close context");
         //no read any more and try to send out data
         _con_status |= DISABLE_READ;
     }
 
 private:
-        void reset_to_oneshot();
 
     //当要关闭的时候调用
     void context_close();
@@ -90,14 +79,12 @@ private:
     //有写事件的时候调用
     void context_write();
 
-
-
-    CRpcServer* _server;
+    EventLoop* _loop;
 
     //socket
     Socket _socket;
 
-    //本次触发的时间
+    //本次触发的事件
     uint32_t _event;
 
     //读取 & 写入的 iobuf
@@ -108,6 +95,7 @@ private:
 
     //对端ip
     std::string _peer_ip;
+
     //对端端口
     int _peer_port;
 

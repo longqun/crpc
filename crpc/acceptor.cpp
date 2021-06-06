@@ -4,7 +4,7 @@
 namespace crpc
 {
 
-Acceptor::Acceptor(EPoller* poller):_poller(poller), _acceptor_socket(socket(PF_INET, SOCK_STREAM, 0))
+Acceptor::Acceptor():_acceptor_socket(socket(PF_INET, SOCK_STREAM, 0))
 {
 }
 
@@ -44,11 +44,6 @@ int Acceptor::init(const ServerOption& option)
         return -1;
     }
 
-    if (_poller->add_fd(_acceptor_socket.fd(), false) < 0)
-    {
-        crpc_log("add_fd failed %d", errno);
-        return -1;
-    }
     return 0;
 }
 

@@ -6,36 +6,62 @@
 namespace crpc
 {
 
+bool s_stop = false;
+int s_wake_fd = createEventfd();
+
+static void* handle_sig_stop(int)
+{
+	s_stop = true;
+    int64_t i = 1;
+    write(s_wake_fd, &i, sizeof(i));
+    return NULL;
+}
+
+
 const static int s_work_q_size = 4;
 const static int s_steal_q_size = 2048;
 
-CRpcServer::CRpcServer():_acceptor(&_poller),
-                            _work_q_size(s_work_q_size),
-                            _work_q(new WorkStealingQueue<std::weak_ptr<RpcContext>>[_work_q_size]),
-                            _futex_mutex(new FutextMutex[_work_q_size])
+CRpcServer::CRpcServer():_work_q_size(s_work_q_size), _latch(_work_q_size)
 {
-    _thread.resize(_work_q_size, NULL);
-    for (int i = 0; i < _work_q_size; ++i)
+    for (size_t i = 0; i < _work_q_size; ++i)
     {
-        _thread[i] = new WorkThread(this, &_futex_mutex[i], &_work_q[i]);
-        _work_q[i].init(s_steal_q_size);
+        EventLoop* loop = new EventLoop();
+        _thread.push_back(new WorkThread(loop, &_latch));
+        _loop.push_back(loop);
     }
 }
 
 CRpcServer::~CRpcServer()
 {
+    //wait for the latch
+    _latch.wait();
 
+    //all thread stop clean thread  & loop
+    for (size_t i = 0; i < _work_q_size; ++i)
+    {
+        delete _thread[i];
+        delete _loop[i];
+    }
+
+    _thread.clear();
+    _loop.clear();
 }
 
-void CRpcServer::handle_acceptor()
+EventLoop* CRpcServer::get_next_loop()
+{
+    assert(_loop.size() > 0);
+    _loop_index = (_loop_index + 1) % _loop.size();
+    return _loop[_loop_index];
+}
+
+
+void CRpcServer::handle_acceptor(int accept_fd, int event)
 {
     int fd = -1;
     while ((fd = _acceptor.accept()) != -1)
     {
-        //new rpccontext
-        std::shared_ptr<RpcContext> ptr(new RpcContext(fd, this));
-        _poller.add_fd(fd, true);
-        _context_map[fd] = ptr;
+        EventLoop* loop = get_next_loop();
+        loop->run_in_loop(std::bind(&EventLoop::add_fd, loop, fd));
     }
 }
 
@@ -49,45 +75,12 @@ void CRpcServer::add_http_service(::google::protobuf::Service* service, const st
     add_rpc_http_service(service, url_path, method);
 }
 
-bool CRpcServer::steal(std::weak_ptr<RpcContext>* ptr)
-{
-    for (int i = 0; i < _work_q_size; ++i)
-    {
-        if (_work_q[i].steal(ptr))
-            return true;
-    }
-    return false;
-}
-
-void CRpcServer::del_fd(int fd)
-{
-    MutexGuard mutex(_mutex);
-    _del_fd.push_back(fd);
-    _poller.wakeup_poll();
-}
-
-void CRpcServer::handle_del_list()
-{
-    MutexGuard mutex(_mutex);
-
-    for (auto& ref : _del_fd)
-    {
-        if (_poller.del_fd(ref) < 0)
-        {
-            crpc_log("del fd %d failed %d", ref, errno);
-        }
-
-        _context_map[ref].reset();
-        _context_map.erase(ref);
-    }
-    _del_fd.clear();
-}
-
-void CRpcServer::start(const ServerOption& option, ProtoType type)
+void CRpcServer::start(const ServerOption& option)
 {
     signal(SIGPIPE, SIG_IGN);
+    //signal(SIGSTOP, handle_sig_stop);
+    _main_loop.add_fd(_acceptor.fd());
     _option = option;
-    _type = type;
     _acceptor.init(option);
     run();
 }
@@ -100,72 +93,9 @@ void CRpcServer::run()
         _thread[i]->run();
     }
 
-    while (true)
-    {
-        int length = _poller.poll();
-        std::vector<struct epoll_event>& event_vec = _poller.get_event_vec();
-        std::list<int> wake_thread;
-
-        for (int i = 0; i < length; ++i)
-        {
-            //handle acceptor
-            if(event_vec[i].data.fd == _acceptor.fd())
-            {
-                handle_acceptor();
-            }
-            else if (event_vec[i].data.fd == _poller.wake_fd())
-            {
-                //起唤醒作用而已
-                char buf[1024];
-                while (read(event_vec[i].data.fd, buf, sizeof(buf)) >= 0);
-                //处理需要close的fd
-                handle_del_list();
-            }
-            else
-            {
-                auto itr = _context_map.find(event_vec[i].data.fd);
-                if (itr == _context_map.end())
-                {
-                    crpc_log("BUG ");
-                    abort();
-                }
-                itr->second->set_event(event_vec[i].events);
-
-                //投递到任务队列中
-                bool success = false;
-                for (int j = 0; j < _work_q_size; ++j)
-                {
-                    int index = (i + j) % _work_q_size;
-                    std::weak_ptr<RpcContext> wp = itr->second;
-                    if (_work_q[index].push(wp))
-                    {
-                        success = true;
-                        //notify
-                        wake_thread.push_back(index);
-                        break;
-                    }
-                    crpc_log("q %d full cur %zu size %zu", index, _work_q[index].volatile_size(), _work_q[index].capacity());
-                }
-
-                //TODO 这里要优化一下，不能用sleep
-                if (!success)
-                {
-                    usleep(100);
-                    --i;
-                }
-            }
-        }
-
-        //notify thread work!
-        for (auto ref : wake_thread)
-        {
-            _futex_mutex[ref].signal();
-        }
-
-    }
+    _main_loop.reg_fd_event_cb(std::bind(&CRpcServer::handle_acceptor, this, std::placeholders::_1, std::placeholders::_2));
+    _main_loop.run();
 }
-
-
 
 }
 

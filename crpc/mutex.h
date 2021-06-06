@@ -29,6 +29,8 @@ public:
 
 private:
     pthread_mutex_t _mutex;
+
+    friend class Condition;
 };
 
 class MutexGuard : NonCopy {

@@ -35,6 +35,12 @@ ParseResult HttpProtocol::parse(IoBuf * io_buf)
     return _req_parse.parse(io_buf);
 }
 
+ParseResult HttpProtocol::proto_match(IoBuf* io_buf)
+{
+    HttpRequestParser parser;
+    return parser.check_http_proto(io_buf);
+}
+
 //TODO 这里不需要填充数据，看下怎么处理
 void HttpProtocol::fill_reply_data(::google::protobuf::Message* req_msg, ::google::protobuf::Message* resp_msg)
 {

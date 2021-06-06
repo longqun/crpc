@@ -256,6 +256,22 @@ int IoBuf::cutn(void * out, int n)
     return ret_len;
 }
 
+int IoBuf::copyn(void * out, int n)
+{
+    assert(n >= 0);
+    int ret_n = std::min(n, (int)_buf_size);
+    char* out_ptr = (char*)out;
+    while (n)
+    {
+        Block* cur = _header;
+
+        size_t cur_len = cur->copyn(out_ptr, n);
+        out_ptr += cur_len;
+        n -= cur_len;
+    }
+    return ret_n;
+}
+
 void IoBuf::append(IoBuf* io_buf)
 {
     assert(io_buf);

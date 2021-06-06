@@ -12,7 +12,7 @@ static std::string get_match_method(const std::string& line)
         if (strncmp(s_http_method[i].c_str(), line.c_str(), std::min(s_http_method[i].size(), line.size())) == 0)
             return s_http_method[i];
     }
-    return 0;
+    return std::string();
 }
 
 static bool parse_head_line(const std::string& line, HttpHeader& header)
@@ -60,6 +60,23 @@ static bool parse_fisrt_head_line(const std::string& line, HttpHeader& header)
 void HttpRequestParser::dump_header()
 {
     _req_header.dump_http_header();
+}
+
+#define HTTP_METHOD_MAX_LEN (7)
+ParseResult HttpRequestParser::check_http_proto(IoBuf* io_buf)
+{
+    //
+    if (io_buf->size() < HTTP_METHOD_MAX_LEN)
+        return NEED_NORE_DATA;
+
+    char buf[HTTP_METHOD_MAX_LEN + 1];
+    io_buf->copyn(buf, sizeof(buf));
+    buf[HTTP_METHOD_MAX_LEN] = '\0';
+
+    if (get_match_method(buf).empty())
+        return PARSE_FAILED;
+
+    return PARSE_SUCCESS;
 }
 
 ParseResult HttpRequestParser::http_parse_header(IoBuf* io_buf)

@@ -19,6 +19,8 @@ public:
     HttpProtocol()
     {}
 
+    static ParseResult proto_match(IoBuf* io_buf);
+
     ParseResult parse(IoBuf* io_buf);
 
     void process();

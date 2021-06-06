@@ -71,6 +71,9 @@ public:
 
     void dump_header();
 
+    //ºÏ≤‚ «∑Ò «http «Î«Û
+    ParseResult check_http_proto(IoBuf* io_buf);
+
 private:
     HTTP_REQ_HEADER_STATUS _req_header_status;
     HTTP_REQ_PARSE_STATUS _req_parse_status;

@@ -59,6 +59,13 @@ struct Block
         return cut_size;
     }
 
+    size_t copyn(void* out, size_t len)
+    {
+        size_t copy_size = std::min(len, read_size());
+        memcpy(out, &buff[read_index], copy_size);
+        return copy_size;
+    }
+
     void reset()
     {
         read_index = write_index = 0;
@@ -89,6 +96,8 @@ public:
     ~IoBuf();
 
     int cutn(void *out, int n);
+
+    int copyn(void* out, int n);
 
     void pop_n(int n);
 

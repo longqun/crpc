@@ -7,6 +7,7 @@
 #include "non_copy.h"
 #include "block_queue.h"
 #include "work_steal_queue.h"
+#include "count_down_latch.h"
 namespace crpc{
 
 class CRpcServer;
@@ -23,19 +24,9 @@ enum WorkStatus
 class WorkThread : NonCopy
 {
 public:
-    WorkThread(CRpcServer* server, FutextMutex* mutex, WorkStealingQueue<std::weak_ptr<RpcContext>>* q);
+    WorkThread(EventLoop* loop, CountDownLatch* latch);
 
     void run();
-
-    void stop()
-    {
-        _status = STOPING;
-    }
-
-    bool stoped() const
-    {
-        return _status == STOPED;
-    }
 
     static void * start_thread(void *arg)
     {
@@ -47,13 +38,8 @@ public:
 
 private:
     void run_internal();
-
-    bool peek(std::weak_ptr<RpcContext> *ptr);
-
-    WorkStatus _status;
-    CRpcServer* _server;
-    FutextMutex* _futex_mutex;
-    WorkStealingQueue<std::weak_ptr<RpcContext>>* _work_q;
+    CountDownLatch* _latch;
+    EventLoop* _loop;
 };
 
 }

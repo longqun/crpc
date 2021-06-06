@@ -25,6 +25,10 @@ enum ParseResult
 //调用链 （解析 -> 处理 -> 写回去）
 struct Proto
 {
+
+    typedef ParseResult (*proto_match)(IoBuf* io_buf);
+    proto_match match;
+
     typedef void* (*proto_new_obj)();
     proto_new_obj proto_new;
 
@@ -38,7 +42,7 @@ struct Proto
     proto_response response;
 };
 
-Proto* get_proto(ProtoType type);
+Proto* select_proto(IoBuf* io_buf);
 
 }
 #endif

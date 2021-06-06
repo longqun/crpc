@@ -6,6 +6,7 @@
 #include <memory>
 #include <list>
 #include <unordered_map>
+#include <functional>
 #include "mutex.h"
 #include "socket.h"
 #include "acceptor.h"
@@ -16,6 +17,8 @@
 #include "non_copy.h"
 #include "block_queue.h"
 #include "common_header.h"
+#include "count_down_latch.h"
+#include "event_loop.h"
 
 namespace crpc
 {
@@ -27,61 +30,37 @@ public:
 
     ~CRpcServer();
 
-    void start(const ServerOption& option, ProtoType type = RPC_PROTO);
+    void start(const ServerOption& option);
 
     void add_service(::google::protobuf::Service* service);
 
     void add_http_service(::google::protobuf::Service* service, const std::string& url_path, const std::string& method);
-
-    //TODO 有没有更加优雅的方式?
-    void del_fd(int fd);
-
-    //TODO 不应该提供这么多无关的功能
-    bool steal(std::weak_ptr<RpcContext>* ptr);
-
-    EPoller& get_poller()
-    {
-        return _poller;
-    }
-
-    ProtoType get_type() const
-    {
-        return _type;
-    }
-
 private:
-
-    static void handle_sig_stop(int sig);
 
     void run();
 
-    void handle_acceptor();
+    void handle_acceptor(int accept_fd, int event);
 
-    void handle_del_list();
+    EventLoop* get_next_loop();
+
+    size_t _loop_index;
 
     //poller related
     Acceptor _acceptor;
-    EPoller _poller;
 
     //work related
     int _work_q_size;
-    WorkStealingQueue<std::weak_ptr<RpcContext>>* _work_q;
 
     //for thread wait notify
-    FutextMutex* _futex_mutex;
     std::vector<WorkThread*> _thread;
-
-   //rcpcontex related
-    std::unordered_map<int, std::shared_ptr<RpcContext>> _context_map;
-
-    //lock _del_fd
-    Mutex _mutex;
-    std::list<int> _del_fd;
+    std::vector<EventLoop*> _loop;
 
     //service
     ServerOption _option;
 
-    ProtoType _type;
+    EventLoop _main_loop;
+
+    CountDownLatch _latch;
 };
 
 }

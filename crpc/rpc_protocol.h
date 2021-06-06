@@ -13,13 +13,17 @@
 namespace crpc
 {
 
-//|request   ->    rpc_meta大小（定长4字节)|rpc_meta序列化数据（不定长）|request序列化数据（不定长）
+#define CRPC_STR "CRPC"
+#define CRPC_STR_LEN (4)
+
+//|request   ->    "crpc"(固定字符串)| rpc_meta大小（定长4字节)|rpc_meta序列化数据（不定长）|request序列化数据（不定长）
 // response  ->    response_size(定长4字节)|response序列号数据（不定长）
 //status 当前解析状态
 enum RpcParseStatus
 {
     INVALID_STATUS,
     INIT,
+    AFTER_CRPC,
     META_SIZE,
     META_DATA,
 };
@@ -63,6 +67,8 @@ class RpcProtocol
 public:
     RpcProtocol()
     {}
+
+    static ParseResult proto_match(IoBuf* io_buf);
 
     ParseResult parse(IoBuf* io_buf);
 

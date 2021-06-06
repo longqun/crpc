@@ -1,5 +1,6 @@
 #include <sys/epoll.h>
 #include <pthread.h>
+#include "utills.h"
 #include "crpc_log.h"
 #include "rpccontext.h"
 #include "crpc_server.h"
@@ -7,10 +8,10 @@
 namespace crpc
 {
 
-RpcContext::RpcContext(int fd, CRpcServer* server):_server(server), _socket(fd),
+RpcContext::RpcContext(int fd, EventLoop* loop):_loop(loop), _socket(fd),
                                                       _con_status(CONTEXT_NORMAL),
-                                                      _proto(get_proto(_server->get_type())),
-                                                      _user_data((void *)_proto->proto_new())
+                                                      _proto(NULL),
+                                                      _user_data(NULL)
 {
     _socket.set_non_blocking();
 
@@ -21,7 +22,14 @@ RpcContext::RpcContext(int fd, CRpcServer* server):_server(server), _socket(fd),
     getpeername(fd, (struct sockaddr *)&sa, &len);
     _peer_port = ntohs(sa.sin_port);
     _peer_ip = inet_ntop(AF_INET, &sa.sin_addr, ipAddr, sizeof(ipAddr));
-    //crpc_log("create context %p %d\n", this, _socket.fd());
+    crpc_log("new context %p %d\n", this, _socket.fd());
+}
+
+RpcContext::~RpcContext()
+{
+    crpc_log("destroy context %p %d\n", this, _socket.fd());
+    close(_socket.fd());
+    delete _user_data;
 }
 
 void RpcContext::context_read()
@@ -46,6 +54,19 @@ void RpcContext::context_read()
             crpc_log("not normal fd %d port %d read %d read %d write %d", _socket.fd(), _peer_port, errno, _io_buf.size(), _write_io_buf.size());
             _con_status |= DISABLE_READ;
             break;
+        }
+
+        //识别协议
+        if (!_proto)
+        {
+            _proto = select_proto(&_io_buf);
+            if (!_proto)
+            {
+                crpc_log("select proto failed");
+                continue;
+            }
+
+            _user_data = _proto->proto_new();
         }
 
         ParseResult result = _proto->parse(&_io_buf, _user_data);
@@ -86,11 +107,13 @@ void RpcContext::context_write()
 
 void RpcContext::context_close()
 {
-    _server->del_fd(_socket.fd());
+    crpc_log("loop remove fd %d", _socket.fd());
+    _loop->remove_fd(_socket.fd());
 }
 
-void RpcContext::handle_event()
+void RpcContext::handle_event(uint32_t event)
 {
+    _event = event;
     //read ?
     if (CAN_READ(_con_status) && _event & (EPOLLIN | EPOLLERR | EPOLLHUP))
     {
@@ -109,11 +132,8 @@ void RpcContext::handle_event()
     if ((!CAN_READ(_con_status) && _write_io_buf.size() == 0) ||
         !CAN_WRITE(_con_status) || STATUS_ERROR(_con_status))
     {
+        crpc_log("emit close %d %u", _con_status, _write_io_buf.size());
         context_close();
-    }
-    else
-    {
-        _server->get_poller().reset_oneshot(_socket.fd());
     }
 }
 

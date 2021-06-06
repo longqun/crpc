@@ -27,7 +27,7 @@ public:
         return _acceptor_socket.fd();
     }
 
-    explicit Acceptor(EPoller* poller);
+    explicit Acceptor();
 
     int init(const ServerOption& option);
 
@@ -40,7 +40,6 @@ public:
 
 private:
     ServerOption _option;
-    EPoller *_poller;
     Socket _acceptor_socket;
 };
 

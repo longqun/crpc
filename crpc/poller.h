@@ -17,30 +17,17 @@ class EPoller
 {
 public:
     EPoller();
-    int add_fd(int fd, bool one_shot);
+    int add_fd(int fd);
 
     int del_fd(int fd);
 
     int mod_fd(int fd, int event);
 
-    int reset_oneshot(int fd);
-
     int poll();
-
-    void wakeup_poll()
-    {
-        uint64_t i = 1;
-        ::write(_wake_fd, &i, sizeof(uint64_t));
-    }
 
     std::vector<struct epoll_event>& get_event_vec()
     {
         return _event_vec;
-    }
-
-    int wake_fd() const
-    {
-        return _wake_fd;
     }
 
     int poll_fd() const
@@ -49,7 +36,6 @@ public:
     }
 
 private:
-    int _wake_fd;
     int _poll_fd;
     std::vector<struct epoll_event> _event_vec;
 };
