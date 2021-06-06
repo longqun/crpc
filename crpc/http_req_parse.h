@@ -38,6 +38,20 @@ public:
         reset();
     }
 
+    HttpRequestParser& operator= (HttpRequestParser &&req)
+    {
+        _req_header_status = req._req_header_status;
+        _req_parse_status = req._req_parse_status;
+        _req_header = std::move(req._req_header);
+        req._req_header.reset();
+
+        _body_buff = req._body_buff;
+        _body_size = req._body_size;
+
+        req._body_buff = NULL;
+        req._body_size = 0;
+    }
+
     HttpHeader& get_http_header()
     {
         return _req_header;

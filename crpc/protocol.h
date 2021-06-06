@@ -6,6 +6,7 @@ namespace crpc
 {
 
 class RpcContext;
+class ProtoRpcController;
 
 //目前支持的协议rpc,http
 enum ProtoType
@@ -35,14 +36,17 @@ struct Proto
     typedef ParseResult (*proto_parse)(IoBuf* io_buf, void* user_data);
     proto_parse parse;
 
-    typedef void (*proto_process)(void* user_data);
+    typedef void (*proto_process)(RpcContext* context, void* user_data);
     proto_process process;
 
-    typedef void (*proto_response)(RpcContext* context, IoBuf* io_buf, void* user_data);
+    typedef void (*proto_response)(ProtoRpcController* con,RpcContext* context, IoBuf* io_buf, void* user_data);
     proto_response response;
 };
 
 Proto* select_proto(IoBuf* io_buf);
 
 }
+
+
+
 #endif

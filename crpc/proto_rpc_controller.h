@@ -4,14 +4,22 @@
 #include <string>
 #include "google/protobuf/service.h"
 #include "google/protobuf/stubs/common.h"
+#include "rpccontext.h"
 #include "io_buf.h"
 #include "http_req_parse.h"
 
 namespace crpc{
+class RpcContext;
+class EventLoop;
 
 //fake controller
 class ProtoRpcController : public ::google::protobuf::RpcController {
     public:
+      ProtoRpcController(RpcContext* context, HttpRequestParser* req = NULL);
+
+      ~ProtoRpcController();
+
+
       virtual void Reset() { };
       virtual bool Failed() const { return false; };
       virtual std::string ErrorText() const { return ""; };
@@ -25,19 +33,19 @@ class ProtoRpcController : public ::google::protobuf::RpcController {
         return _write_io;
     }
 
-    void set_http_parser(HttpRequestParser* ptr)
-    {
-        _http_req_parse = ptr;
-    }
-
     HttpRequestParser* get_http_parser()
     {
-        assert(_http_req_parse);
-        return (_http_req_parse);
+        return &_http_req_parse;
     }
 
+    EventLoop* get_runing_loop();
+
+    RpcContext* get_context();
+
+
     private:
-        HttpRequestParser* _http_req_parse;
+        RpcContext* _context;
+        HttpRequestParser _http_req_parse;
         //针对http这种无法直接写入到返回中的，就写入到这里面
         IoBuf _write_io;
 };

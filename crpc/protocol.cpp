@@ -28,17 +28,17 @@ ParseResult default_proto_parse(IoBuf* io_buf, void* user_data)
 }
 
 template <typename T>
-void default_proto_process(void* user_data)
+void default_proto_process(RpcContext* context, void* user_data)
 {
     T* call_proto = (T*)user_data;
-    call_proto->process();
+    call_proto->process(context);
 }
 
 template <typename T>
-void default_proto_response(RpcContext* context, IoBuf* io_buf, void* user_data)
+void default_proto_response(ProtoRpcController* con, RpcContext* context, IoBuf* io_buf, void* user_data)
 {
     T* call_proto = (T*)user_data;
-    call_proto->response(context, io_buf);
+    call_proto->response(con, context, io_buf);
 }
 //------default_proto--------
 

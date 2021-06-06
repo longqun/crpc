@@ -46,11 +46,6 @@ public:
         return _socket.fd();
     }
 
-    uint32_t get_status() const
-    {
-        return _con_status;
-    }
-
     int get_peer_port() const
     {
         return _peer_port;
@@ -67,6 +62,26 @@ public:
         //no read any more and try to send out data
         _con_status |= DISABLE_READ;
     }
+
+    EventLoop* get_context_loop()
+    {
+        return _loop;
+    }
+
+    void add_ref()
+    {
+        ++_ref_cnt;
+    }
+
+    void dec_ref()
+    {
+        --_ref_cnt;
+        if (_ref_cnt <= 0)
+            delete this;
+    }
+
+    //触发response
+    void trigger_response(ProtoRpcController* con);
 
 private:
 
@@ -104,6 +119,8 @@ private:
 
     //user_data会根据proto来创建对应的结构体
     void* _user_data;
+
+    int _ref_cnt;
 };
 
 }

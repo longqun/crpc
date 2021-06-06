@@ -2,6 +2,7 @@
 #include "rpc_service.h"
 #include "crpc_log.h"
 #include "http_protocol.h"
+#include "rpc_closure.h"
 
 namespace crpc
 {
@@ -48,15 +49,12 @@ void HttpProtocol::fill_reply_data(::google::protobuf::Message* req_msg, ::googl
     std::unique_ptr<::google::protobuf::Message> resp_guard(resp_msg);
 }
 
-void HttpProtocol::process()
+void HttpProtocol::process(RpcContext* context)
 {
     //set controller http req header
     HttpHeader& http_req = _req_parse.get_http_header();
-    _controller.set_http_parser(&_req_parse);
-
     //invoke by url
     std::pair<std::string, std::string> pair = RpcService::get_instance()->get_service_method_pair(http_req.get_header(std::string(HTTP_URL_PATH)));
-
     //now we get service & method just call it
     ::google::protobuf::Service* service =  get_rpc_service(pair.first);
     CallMessage msg =  RpcService::get_instance()->get_call_msg(pair.first, pair.second);
@@ -68,14 +66,17 @@ void HttpProtocol::process()
         http_req.dump_http_header();
         return;
     }
-    auto done = ::google::protobuf::NewCallback(this, &HttpProtocol::fill_reply_data, msg.req, msg.resp);
-    service->CallMethod(msg.md, &_controller, msg.req, msg.resp, done);
+
+    ProtoRpcController* controller = new ProtoRpcController(context, &_req_parse);
+    auto done = new  CRpcClosure(controller, std::bind(&HttpProtocol::fill_reply_data, this, msg.req, msg.resp));
+    service->CallMethod(msg.md, controller, msg.req, msg.resp, done);
+    reset();
 }
 
 //TODO 处理发送10G的大文件，如果都写入到iobuf是否可行?
-void HttpProtocol::response(RpcContext* context, IoBuf* io_buf)
+void HttpProtocol::response(ProtoRpcController* controller, RpcContext* context, IoBuf* io_buf)
 {
-    auto& ref_iobuf = _controller.get_write_io_buf();
+    auto& ref_iobuf = controller->get_write_io_buf();
 
     //write http response header
     append_http_response_header(io_buf, ref_iobuf.size());

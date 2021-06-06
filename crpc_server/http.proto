@@ -7,4 +7,5 @@ message HttpResponse {};
 
 service HttpService {
   rpc Echo(HttpRequest) returns (HttpResponse);
+  rpc AsynEcho(HttpRequest) returns (HttpResponse);
 };

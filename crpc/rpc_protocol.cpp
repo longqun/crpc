@@ -1,5 +1,6 @@
 #include "rpc_protocol.h"
 #include "crpc_log.h"
+#include "rpc_closure.h"
 
 namespace crpc
 {
@@ -82,9 +83,9 @@ void RpcProtocol::fill_reply_data(::google::protobuf::Message* req_msg, ::google
     _response.response_len = _response.proto_str.size();
 }
 
-void RpcProtocol::invoke_user_cb()
+void RpcProtocol::invoke_user_cb(RpcContext* context)
 {
-    ProtoRpcController controller;
+    ProtoRpcController* controller = new ProtoRpcController(context);
     ::google::protobuf::Service* service =  get_rpc_service(_header.rpc_meta.service_name());
     CallMessage msg =  RpcService::get_instance()->get_call_msg(_header.rpc_meta.service_name(), _header.rpc_meta.method_name());
     if(!msg.valid || !service)
@@ -94,17 +95,17 @@ void RpcProtocol::invoke_user_cb()
     }
 
     msg.req->ParseFromString(_header.probuf_str);
-    auto done = ::google::protobuf::NewCallback(this, &RpcProtocol::fill_reply_data, msg.req, msg.resp);
-    service->CallMethod(msg.md, &controller, msg.req, msg.resp, done);
+    auto done = new CRpcClosure(controller, std::bind(&RpcProtocol::fill_reply_data, this, msg.req, msg.resp));
+    service->CallMethod(msg.md, controller, msg.req, msg.resp, done);
     _header.reset();
 }
 
-void RpcProtocol::process()
+void RpcProtocol::process(RpcContext* context)
 {
-    invoke_user_cb();
+    invoke_user_cb(context);
 }
 
-void RpcProtocol::response(RpcContext* context, IoBuf * io_buf)
+void RpcProtocol::response(ProtoRpcController* controller ,RpcContext* context, IoBuf * io_buf)
 {
     io_buf->append(&_response.response_len, sizeof(size_t));
     io_buf->append(_response.proto_str.c_str(), _response.proto_str.size());

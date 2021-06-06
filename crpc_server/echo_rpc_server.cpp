@@ -1,10 +1,30 @@
 #include "crpc/crpc_server.h"
 #include "echo.pb.h"
 #include "http.pb.h"
+#include <unistd.h>
 
 using namespace crpc;
 
 #define OUT_WORLD "hello world\n"
+
+struct wrap_obj
+{
+    ProtoRpcController* con;
+    ::google::protobuf::Closure *done;
+};
+
+void* thread_out_put(void* arg)
+{
+    pthread_detach(pthread_self());
+    wrap_obj* obj = (wrap_obj*) arg;
+    IoBuf& out_buf = obj->con->get_write_io_buf();
+    /**/
+    out_buf.append(OUT_WORLD, strlen(OUT_WORLD));
+    sleep(2);
+    obj->done->Run();
+    delete obj;
+    return NULL;
+}
 
 //http service
 class HttpEchoService : public http::HttpService {
@@ -21,6 +41,19 @@ public:
 
     out_buf.append(OUT_WORLD, strlen(OUT_WORLD));
     done->Run();
+  }
+
+    virtual void AsynEcho(::google::protobuf::RpcController* con,
+                       const ::http::HttpRequest* request,
+                       ::http::HttpResponse* response,
+                       ::google::protobuf::Closure* done) {
+
+    wrap_obj *obj = new wrap_obj();
+    obj->con = (ProtoRpcController*)con;
+    obj->done = done;
+
+    pthread_t ntid;
+    int err = pthread_create(&ntid, NULL, thread_out_put, obj);
   }
 };
 
@@ -48,6 +81,7 @@ int main()
 
     server.add_service(&echo_service);
     server.add_http_service(&http_echo_service,"/v1/echo/", "Echo");
+    server.add_http_service(&http_echo_service,"/v1/AsynEcho/", "AsynEcho");
     server.start(option);
 }
 

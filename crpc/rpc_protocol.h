@@ -72,12 +72,12 @@ public:
 
     ParseResult parse(IoBuf* io_buf);
 
-    void process();
+    void process(RpcContext* context);
 
-    void response(RpcContext* context, IoBuf* io_buf);
+    void response(ProtoRpcController* controller, RpcContext* context, IoBuf* io_buf);
 
 private:
-    void invoke_user_cb();
+    void invoke_user_cb(RpcContext* context);
     void fill_reply_data(::google::protobuf::Message* req_msg, ::google::protobuf::Message* resp_msg);
     rpc_header _header;
     rpc_response _response;

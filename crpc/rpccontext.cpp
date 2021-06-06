@@ -4,14 +4,15 @@
 #include "crpc_log.h"
 #include "rpccontext.h"
 #include "crpc_server.h"
-
+#include "proto_rpc_controller.h"
 namespace crpc
 {
 
 RpcContext::RpcContext(int fd, EventLoop* loop):_loop(loop), _socket(fd),
                                                       _con_status(CONTEXT_NORMAL),
                                                       _proto(NULL),
-                                                      _user_data(NULL)
+                                                      _user_data(NULL),
+                                                      _ref_cnt(1)
 {
     _socket.set_non_blocking();
 
@@ -80,11 +81,18 @@ void RpcContext::context_read()
             break;
         }
 
-        _proto->process(_user_data);
-        _proto->response(this, &_write_io_buf, _user_data);
-        //write out?
-        context_write();
+        _proto->process(this, _user_data);
     }
+}
+
+void RpcContext::trigger_response(ProtoRpcController* con)
+{
+    _proto->response(con, this, &_write_io_buf, _user_data);
+    //write out?
+    context_write();
+
+    //may has request wait? just for test
+    context_read();
 }
 
 void RpcContext::context_write()

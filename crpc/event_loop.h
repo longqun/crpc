@@ -54,12 +54,18 @@ public:
     //将fun移入到loop执行
     void run_in_loop(const functor& fun)
     {
+        if (is_in_loop_thread())
+        {
+            fun();
+            return;
+        }
+
         {
             MutexGuard guard(_pending_mutex);
             _pending_functors.push_back(fun);
         }
-        if (!is_in_loop_thread())
-            wake_up();
+
+        wake_up();
     }
 
 private:

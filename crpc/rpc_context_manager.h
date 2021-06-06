@@ -12,8 +12,6 @@
 namespace crpc
 {
 
-
-
 class RpcContextManager
 {
 public:
@@ -47,10 +45,9 @@ public:
         if (_manger_map.find(fd) == _manger_map.end())
             return;
 
-        delete _manger_map[fd];
+        _manger_map[fd]->dec_ref();
         _manger_map.erase(fd);
     }
-
 
     void handle_context_event(int fd, int event)
     {

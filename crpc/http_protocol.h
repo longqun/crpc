@@ -23,9 +23,9 @@ public:
 
     ParseResult parse(IoBuf* io_buf);
 
-    void process();
+    void process(RpcContext* context);
 
-    void response(RpcContext* context, IoBuf* io_buf);
+    void response(ProtoRpcController* con, RpcContext* context, IoBuf* io_buf);
 
 private:
 
@@ -35,7 +35,6 @@ private:
     //TODO ½â¾öhttp keep-alive
     void reset();
 
-    ProtoRpcController _controller;
     HttpRequestParser _req_parse;
 };
 
