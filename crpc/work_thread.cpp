@@ -7,7 +7,7 @@
 namespace crpc{
 
 WorkThread::WorkThread(EventLoop* loop, CountDownLatch* latch)
-            : _loop(loop), _latch(latch)
+            : _latch(latch), _loop(loop)
 {}
 
 

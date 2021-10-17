@@ -6,55 +6,22 @@
 namespace crpc
 {
 
-//------default_proto--------
+static HttpProtocol s_http_proto;
+static RpcProtocol s_rpc_proto;
 
-template <typename T>
-ParseResult default_proto_match(IoBuf* io_buf)
+static Protocol *protocol_vec[] = {
+    &s_http_proto,
+    &s_rpc_proto,
+    NULL
+};
+
+Protocol *select_proto(IoBuf &buf)
 {
-    return T::proto_match(io_buf);
-}
-
-template <typename T>
-void *proto_new()
-{
-    return (void *)new T();
-}
-
-template <typename T>
-ParseResult default_proto_parse(IoBuf* io_buf, void* user_data)
-{
-    T* call_proto = (T*)user_data;
-    return call_proto->parse(io_buf);
-}
-
-template <typename T>
-void default_proto_process(RpcContext* context, void* user_data)
-{
-    T* call_proto = (T*)user_data;
-    call_proto->process(context);
-}
-
-template <typename T>
-void default_proto_response(ProtoRpcController* con, RpcContext* context, IoBuf* io_buf, void* user_data)
-{
-    T* call_proto = (T*)user_data;
-    call_proto->response(con, context, io_buf);
-}
-//------default_proto--------
-
-static Proto vec[MAX_PROTO] = {
-                                {default_proto_match<RpcProtocol>, proto_new<RpcProtocol>, default_proto_parse<RpcProtocol>, default_proto_process<RpcProtocol>, default_proto_response<RpcProtocol>},
-                                {default_proto_match<HttpProtocol>, proto_new<HttpProtocol>, default_proto_parse<HttpProtocol>, default_proto_process<HttpProtocol>, default_proto_response<HttpProtocol>}, 
-                              };
-
-Proto* select_proto(IoBuf* io_buf)
-{
-    for (size_t i = 0; i < MAX_PROTO; ++i)
+    size_t len = sizeof(protocol_vec) / sizeof(void *);
+    for (size_t i = 0; i < len; ++i)
     {
-        if (vec[i].match(io_buf) == PARSE_SUCCESS)
-        {
-            return &vec[i];
-        }
+        if (protocol_vec[i]->proto_match(&buf) == == PARSE_SUCCESS)
+            return protocol_vec[i];
     }
     return NULL;
 }

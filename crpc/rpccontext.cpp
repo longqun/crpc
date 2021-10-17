@@ -11,7 +11,6 @@ namespace crpc
 RpcContext::RpcContext(int fd, EventLoop* loop):_loop(loop), _socket(fd),
                                                       _con_status(CONTEXT_NORMAL),
                                                       _proto(NULL),
-                                                      _user_data(NULL),
                                                       _ref_cnt(1)
 {
     _socket.set_non_blocking();
@@ -29,8 +28,9 @@ RpcContext::RpcContext(int fd, EventLoop* loop):_loop(loop), _socket(fd),
 RpcContext::~RpcContext()
 {
     crpc_log("destroy context %p %d\n", this, _socket.fd());
+    if (_proto)
+        _proto->del_proto_ctx(_proto_ctx);
     close(_socket.fd());
-    delete _user_data;
 }
 
 void RpcContext::context_read()
@@ -60,17 +60,16 @@ void RpcContext::context_read()
         //识别协议
         if (!_proto)
         {
-            _proto = select_proto(&_io_buf);
+            _proto = select_proto(_io_buf);
             if (!_proto)
             {
                 crpc_log("select proto failed");
                 continue;
             }
-
-            _user_data = _proto->proto_new();
+            _proto_ctx = _proto->alloc_proto_ctx();
         }
 
-        ParseResult result = _proto->parse(&_io_buf, _user_data);
+        ParseResult result = _proto->proto_parse(&_io_buf, this);
         if (result == NEED_NORE_DATA)
         {
             continue;
@@ -81,13 +80,14 @@ void RpcContext::context_read()
             break;
         }
 
-        _proto->process(this, _user_data);
+        _proto->proto_process(this);
+        _proto->proto_finished(this);
     }
 }
 
 void RpcContext::trigger_response(ProtoRpcController* con)
 {
-    _proto->response(con, this, &_write_io_buf, _user_data);
+    _proto->proto_response(con, this, &_write_io_buf);
     //write out?
     context_write();
 

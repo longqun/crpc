@@ -30,16 +30,30 @@ void append_http_response_header(IoBuf* io_buf, int64_t payload_size)
     io_buf->append(HTTP_RESPONSE_CRLF, strlen(HTTP_RESPONSE_CRLF));
 }
 
-ParseResult HttpProtocol::parse(IoBuf * io_buf)
+ParseResult HttpProtocol::proto_parse(IoBuf * io_buf, RpcContext *context)
 {
-    //header 
-    return _req_parse.parse(io_buf);
+    HttpRequestParser *req_parse = (HttpRequestParser *)context->get_proto_context();
+    //context复用？
+    return req_parse->parse(io_buf);
 }
 
 ParseResult HttpProtocol::proto_match(IoBuf* io_buf)
 {
     HttpRequestParser parser;
     return parser.check_http_proto(io_buf);
+}
+
+void *HttpProtocol::alloc_proto_ctx()
+{
+    HttpRequestParser *req_parse = new HttpRequestParser();
+    req_parse->reset();
+    return req_parse;
+}
+
+void HttpProtocol::del_proto_ctx(void * context)
+{
+    HttpRequestParser *req_parse = (HttpRequestParser *)context;
+    delete req_parse;
 }
 
 //TODO 这里不需要填充数据，看下怎么处理
@@ -49,10 +63,11 @@ void HttpProtocol::fill_reply_data(::google::protobuf::Message* req_msg, ::googl
     std::unique_ptr<::google::protobuf::Message> resp_guard(resp_msg);
 }
 
-void HttpProtocol::process(RpcContext* context)
+void HttpProtocol::proto_process(RpcContext* context)
 {
     //set controller http req header
-    HttpHeader& http_req = _req_parse.get_http_header();
+    HttpRequestParser *req_parse = (HttpRequestParser *)context->get_proto_context();
+    HttpHeader& http_req = req_parse->get_http_header();
     //invoke by url
     std::pair<std::string, std::string> pair = RpcService::get_instance()->get_service_method_pair(http_req.get_header(std::string(HTTP_URL_PATH)));
     //now we get service & method just call it
@@ -64,17 +79,20 @@ void HttpProtocol::process(RpcContext* context)
     {
         crpc_log("bad request!");
         http_req.dump_http_header();
+        //no valid function close it!!
+        context->set_context_close();
         return;
     }
 
-    ProtoRpcController* controller = new ProtoRpcController(context, &_req_parse);
+    ProtoRpcController* controller = new ProtoRpcController(context, req_parse);
     auto done = new  CRpcClosure(controller, std::bind(&HttpProtocol::fill_reply_data, this, msg.req, msg.resp));
     service->CallMethod(msg.md, controller, msg.req, msg.resp, done);
-    reset();
+
+    proto_finished(context);
 }
 
 //TODO 处理发送10G的大文件，如果都写入到iobuf是否可行?
-void HttpProtocol::response(ProtoRpcController* controller, RpcContext* context, IoBuf* io_buf)
+void HttpProtocol::proto_response(ProtoRpcController* controller, RpcContext* context, IoBuf* io_buf)
 {
     auto& ref_iobuf = controller->get_write_io_buf();
 
@@ -86,12 +104,12 @@ void HttpProtocol::response(ProtoRpcController* controller, RpcContext* context,
 
     //TODO 支持keep-alive
     context->set_context_close();
-    reset();
 }
 
-void HttpProtocol::reset()
+void HttpProtocol::proto_finished(RpcContext* context)
 {
-    _req_parse.reset();
+    HttpRequestParser *req_parse = (HttpRequestParser *)context->get_proto_context();
+    req_parse->reset();
 }
 
 }

@@ -8,14 +8,6 @@ namespace crpc
 class RpcContext;
 class ProtoRpcController;
 
-//目前支持的协议rpc,http
-enum ProtoType
-{
-    RPC_PROTO,
-    HTTP_PROTO,
-    MAX_PROTO
-};
-
 enum ParseResult
 {
     NEED_NORE_DATA,
@@ -23,30 +15,38 @@ enum ParseResult
     PARSE_SUCCESS
 };
 
-//调用链 （解析 -> 处理 -> 写回去）
-struct Proto
+class Protocol
 {
+public:
+    Protocol()
+    {
+    }
 
-    typedef ParseResult (*proto_match)(IoBuf* io_buf);
-    proto_match match;
+     ~Protocol() {};
 
-    typedef void* (*proto_new_obj)();
-    proto_new_obj proto_new;
+    //协议匹配
+    virtual ParseResult proto_match(IoBuf* io_buf) = 0;
 
-    typedef ParseResult (*proto_parse)(IoBuf* io_buf, void* user_data);
-    proto_parse parse;
+    //创建协议所需要的context
+    virtual void *alloc_proto_ctx() = 0;
 
-    typedef void (*proto_process)(RpcContext* context, void* user_data);
-    proto_process process;
+    //移除创建的context
+    virtual void del_proto_ctx(void *context) = 0;
 
-    typedef void (*proto_response)(ProtoRpcController* con,RpcContext* context, IoBuf* io_buf, void* user_data);
-    proto_response response;
+    //协议解析
+    virtual ParseResult proto_parse(IoBuf* io_buf, RpcContext* context) = 0;
+
+    //回调函数
+    virtual void proto_process(RpcContext* context) = 0;
+
+    //协议回复数据
+    virtual void proto_response(ProtoRpcController* con, RpcContext* context, IoBuf* io_buf) = 0;
+
+    //协议回复数据完成回调，可以用来重置ctx状态。
+    virtual void proto_finished(RpcContext* context) = 0;
 };
 
-Proto* select_proto(IoBuf* io_buf);
+Protocol *select_proto(IoBuf& buf);
 
 }
-
-
-
 #endif

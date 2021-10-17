@@ -17,7 +17,6 @@ static void* handle_sig_stop(int)
     return NULL;
 }
 
-
 const static int s_work_q_size = 4;
 const static int s_steal_q_size = 2048;
 

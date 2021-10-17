@@ -13,29 +13,38 @@ namespace crpc
 {
 
 //http协议解析
-class HttpProtocol
+class HttpProtocol : public Protocol
 {
 public:
     HttpProtocol()
     {}
 
-    static ParseResult proto_match(IoBuf* io_buf);
+    ~HttpProtocol()
+    {}
 
-    ParseResult parse(IoBuf* io_buf);
+    //协议匹配
+    virtual ParseResult proto_match(IoBuf* io_buf);
 
-    void process(RpcContext* context);
+    //创建协议所需要的context
+    virtual void *alloc_proto_ctx();
 
-    void response(ProtoRpcController* con, RpcContext* context, IoBuf* io_buf);
+    //移除创建的context
+    virtual void del_proto_ctx(void *context);
+
+    //协议解析
+    virtual ParseResult proto_parse(IoBuf* io_buf, RpcContext* context);
+
+    //回调函数
+    virtual void proto_process(RpcContext* context);
+
+    //协议回复数据
+    virtual void proto_response(ProtoRpcController* con, RpcContext* context, IoBuf* io_buf);
+
+    //协议回复数据完成回调，可以用来重置ctx状态。
+    virtual void proto_finished(RpcContext* context);
 
 private:
-
     void fill_reply_data(::google::protobuf::Message* req_msg, ::google::protobuf::Message* resp_msg);
-
-
-    //TODO 解决http keep-alive
-    void reset();
-
-    HttpRequestParser _req_parse;
 };
 
 }

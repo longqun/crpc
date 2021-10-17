@@ -50,6 +50,7 @@ public:
 
         req._body_buff = NULL;
         req._body_size = 0;
+        return *this;
     }
 
     HttpHeader& get_http_header()

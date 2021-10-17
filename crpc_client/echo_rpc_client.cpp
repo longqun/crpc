@@ -13,7 +13,7 @@ void* call_rpc(void *)
     request.set_msg("hello, myrpc.");
 
     echo::EchoService_Stub stub(&channel);
-    ProtoRpcController cntl;
+    ProtoRpcController cntl(new RpcContext(-1, NULL));
     while (true)
     {
         stub.Echo(&cntl, &request, &response, NULL);

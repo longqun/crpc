@@ -83,6 +83,16 @@ public:
     //触发response
     void trigger_response(ProtoRpcController* con);
 
+    void set_proto_context(void *ptr)
+    {
+        _proto_ctx = ptr;
+    }
+
+    void *get_proto_context()
+    {
+        return _proto_ctx;
+    }
+
 private:
 
     //当要关闭的时候调用
@@ -115,10 +125,10 @@ private:
     int _peer_port;
 
     //协议解析
-    Proto* _proto;
+    Protocol* _proto;
 
-    //user_data会根据proto来创建对应的结构体
-    void* _user_data;
+    //协议私有化指针
+    void* _proto_ctx;
 
     int _ref_cnt;
 };

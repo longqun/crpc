@@ -62,25 +62,47 @@ struct rpc_response
 };
 
 //抽象出来专门用来解析rpc的
-class RpcProtocol
+class RpcProtocol : public Protocol
 {
+private:
+    struct RpcProtocolContext
+    {
+        rpc_header _header;
+        rpc_response _response;
+    };
 public:
     RpcProtocol()
     {}
 
-    static ParseResult proto_match(IoBuf* io_buf);
+    ~RpcProtocol()
+    {}
 
-    ParseResult parse(IoBuf* io_buf);
+    //协议匹配
+    virtual ParseResult proto_match(IoBuf* io_buf);
 
-    void process(RpcContext* context);
+    //创建协议所需要的context
+    virtual void *alloc_proto_ctx();
 
-    void response(ProtoRpcController* controller, RpcContext* context, IoBuf* io_buf);
+    //移除创建的context
+    virtual void del_proto_ctx(void *context);
+
+    //协议解析
+    virtual ParseResult proto_parse(IoBuf* io_buf, RpcContext* context);
+
+    //回调函数
+    virtual void proto_process(RpcContext* context);
+
+    //协议回复数据
+    virtual void proto_response(ProtoRpcController* con, RpcContext* context, IoBuf* io_buf);
+
+    //协议回复数据完成回调，可以用来重置ctx状态。
+    virtual void proto_finished(RpcContext* context);
+
 
 private:
     void invoke_user_cb(RpcContext* context);
-    void fill_reply_data(::google::protobuf::Message* req_msg, ::google::protobuf::Message* resp_msg);
-    rpc_header _header;
-    rpc_response _response;
+    void fill_reply_data(::google::protobuf::Message* req_msg, ::google::protobuf::Message* resp_msg, RpcContext *ctx);
+
 };
 
 }
