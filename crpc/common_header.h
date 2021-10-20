@@ -6,7 +6,9 @@
 #include "google/protobuf/service.h"
 #include "google/protobuf/stubs/common.h"
 #include <google/protobuf/descriptor.h>
+#include <functional>
 
+typedef std::function<void ()> functor;
 
 namespace crpc
 {

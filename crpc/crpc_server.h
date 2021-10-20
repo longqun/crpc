@@ -35,6 +35,16 @@ public:
     void add_service(::google::protobuf::Service* service);
 
     void add_http_service(::google::protobuf::Service* service, const std::string& url_path, const std::string& method);
+
+    void timer_run_at(int time, EventLoop* loop, const functor & func);
+
+    void timer_run_every(int time, EventLoop* loop, const functor & func);
+
+    EventLoop* get_main_loop()
+    {
+        return &_main_loop;
+    }
+
 private:
 
     void run();

@@ -3,6 +3,7 @@
 
 #include <functional>
 #include <list>
+#include "crpc_timer.h"
 #include "mutex.h"
 #include "poller.h"
 
@@ -12,7 +13,6 @@ namespace crpc
 typedef std::function<void (int fd)> fd_create_cb;
 typedef std::function<void (int fd, int event)> fd_event_cb;
 typedef std::function<void (int fd)> fd_close_cb;
-typedef std::function<void ()> functor;
 
 
 //TODO 实现一个定时器
@@ -68,7 +68,14 @@ public:
         wake_up();
     }
 
+    void run_at(int time, const functor& func);
+
+    void run_every(int time, const functor& func);
+
 private:
+
+    void run_every_internal(int time, const functor& func);
+    void run_internal(int time, const functor& func);
 
     bool is_in_loop_thread() const
     {
@@ -95,6 +102,8 @@ private:
     EPoller _poller;
 
     pthread_t _loop_thread_id;
+
+    CRpcTimer _timer;
 
 };
 

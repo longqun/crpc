@@ -130,3 +130,16 @@ NOTE:
   1：跟同步接口类似，只需要往对应的数据填充即可，最后调用 done->Run() 方法即可
 ```
 
+## 定时器的使用
+```
+
+  基于eventloop & timerfd 实现，使用map<uint64_t, list<TimerObject>>来存储事件，key = 触发时间戳，value = 需要执行的回调函数
+
+  定时器依赖于eventloop线程，定时任务回调也是执行在eventloop线程。
+
+  void run_at(int time, const functor& func);   //只运行一次，隔time毫秒触发
+
+  void run_every(int time, const functor& func);    //无限运行，每隔time毫秒触发
+
+
+```

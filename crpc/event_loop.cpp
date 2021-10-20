@@ -20,9 +20,10 @@ void read_all_fd(int fd)
     while (read(fd, buf, sizeof(buf)) > 0);
 }
 
-EventLoop::EventLoop():_wake_fd(createEventfd()),_stop(false)
+EventLoop::EventLoop():_wake_fd(createEventfd()), _stop(false)
 {
     _poller.add_fd(_wake_fd);
+    _poller.add_fd(_timer.fd());
 }
 
 void EventLoop::run()
@@ -30,6 +31,7 @@ void EventLoop::run()
     _loop_thread_id = pthread_self();
     while (!_stop)
     {
+        bool has_timer = false;
         int length = _poller.poll();
         std::vector<struct epoll_event>& event_vec = _poller.get_event_vec();
         for (int i = 0; i < length; ++i)
@@ -40,6 +42,9 @@ void EventLoop::run()
                 read_all_fd(_wake_fd);
                 continue;
             }
+
+            if (fd == _timer.fd())
+                has_timer = true;
 
             if (!_fd_event_cb)
             {
@@ -61,6 +66,13 @@ void EventLoop::run()
         for (auto& cb : functor_list)
         {
             cb();
+        }
+
+        //timer ÊÂ¼þ
+        if (has_timer)
+        {
+            read_all_fd(_timer.fd());
+            _timer.on_timer();
         }
     }
 }
@@ -91,6 +103,27 @@ bool EventLoop::add_fd(int fd)
     _poller.add_fd(fd);
     if (_fd_create_cb)
         _fd_create_cb(fd);
+    return true;
+}
+
+void EventLoop::run_every_internal(int time, const functor& func)
+{
+    _timer.run_every(time, func);
+}
+
+void EventLoop::run_internal(int time, const functor& func)
+{
+    _timer.run_at(time, func);
+}
+
+void EventLoop::run_at(int time, const functor& func)
+{
+    run_in_loop(std::bind(&EventLoop::run_internal, this, time, func));
+}
+
+void EventLoop::run_every(int time, const functor& func)
+{
+    run_in_loop(std::bind(&EventLoop::run_every_internal, this, time, func));
 }
 
 }

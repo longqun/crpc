@@ -16,4 +16,12 @@ void print_stacktrace()
     free(stacktrace);
 }
 
+uint64_t get_timestamps_ms()
+{
+    struct timeval current;
+    gettimeofday(&current, NULL);
+    uint64_t ret = current.tv_sec * 1000 + current.tv_usec / 1000;
+    return ret;
+}
+
 }

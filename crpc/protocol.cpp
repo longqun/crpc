@@ -20,7 +20,7 @@ Protocol *select_proto(IoBuf &buf)
     size_t len = sizeof(protocol_vec) / sizeof(void *);
     for (size_t i = 0; i < len; ++i)
     {
-        if (protocol_vec[i]->proto_match(&buf) == == PARSE_SUCCESS)
+        if (protocol_vec[i]->proto_match(&buf) == PARSE_SUCCESS)
             return protocol_vec[i];
     }
     return NULL;

@@ -96,5 +96,15 @@ void CRpcServer::run()
     _main_loop.run();
 }
 
+void CRpcServer::timer_run_at(int time, EventLoop* loop, const functor & func)
+{
+    loop->run_at(time, func);
+}
+
+void CRpcServer::timer_run_every(int time, EventLoop* loop, const functor & func)
+{
+    loop->run_every(time, func);
+}
+
 }
 

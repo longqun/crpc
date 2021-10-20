@@ -71,6 +71,17 @@ public:
   }
 };
 
+void timer_callback()
+{
+    printf("tick \n");
+}
+
+void timer_callback1()
+{
+    printf("timer_callback1 \n");
+}
+
+
 int main()
 {
     ServerOption option(8080, "0.0.0.0");
@@ -82,6 +93,8 @@ int main()
     server.add_service(&echo_service);
     server.add_http_service(&http_echo_service,"/v1/echo/", "Echo");
     server.add_http_service(&http_echo_service,"/v1/AsynEcho/", "AsynEcho");
+    server.timer_run_every(1000, server.get_main_loop(), std::bind(timer_callback));
+    server.timer_run_at(5000, server.get_main_loop(), std::bind(timer_callback1));
     server.start(option);
 }
 
