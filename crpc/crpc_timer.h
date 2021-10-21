@@ -17,7 +17,7 @@ struct TimeObject;
 class CRpcTimer{
 public:
 
-    CRpcTimer():_timer_fd(timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC)), _cur_timer(get_timestamps_ms())
+    CRpcTimer():_timer_fd(timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC)), _tick_timer(0)
     {
     }
 
@@ -47,7 +47,8 @@ private:
     //key = 下次发生定时的时间戳 value = 触发的哪些函数
     std::map<uint64_t, std::list<TimeObject*> > _timer_map;
 
-    uint64_t _cur_timer;
+    //定时器运行了多长时间
+    uint64_t _tick_timer;
 
 };
 

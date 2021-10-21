@@ -12,49 +12,54 @@ struct TimeObject {
 
 TimeObject* CRpcTimer::run_at(int time, const functor& func)
 {
-    _cur_timer = get_timestamps_ms();
+    if (time <= 0)
+        time = 1;
 
     TimeObject* obj = new TimeObject;
     obj->func = func;
-    obj->next_time = _cur_timer + time;
+    obj->next_time = _tick_timer + time;
     obj->repeated = false;
     obj->tick_time = time;
 
     //update next tick
     update_timer(obj);
+    return obj;
 }
 
 TimeObject* CRpcTimer::run_every(int time, const functor& func)
 {
-    _cur_timer = get_timestamps_ms();
-
+    if (time <= 0)
+        time = 1;
     TimeObject* obj = new TimeObject;
     obj->func = func;
-    obj->next_time = _cur_timer + time;
+    obj->next_time = _tick_timer + time;
     obj->repeated = true;
     obj->tick_time = time;
 
     //update next tick
     update_timer(obj);
+    return obj;
 }
 
 void CRpcTimer::on_timer()
 {
-    _cur_timer = get_timestamps_ms();
-    std::list<TimeObject*> obj_list;
     auto itr = _timer_map.begin();
-
     if (itr == _timer_map.end())
         return;
 
     std::list<TimeObject*> &ref = itr->second;
+    assert(!ref.empty());
+
+    //更新时间戳
+    _tick_timer = itr->first;
+
     for (TimeObject* obj : ref)
     {
         obj->func();
         if (obj->repeated)
         {
-            obj->next_time = _cur_timer + obj->tick_time;
-            obj_list.push_back(obj);
+            obj->next_time = _tick_timer + obj->tick_time;
+            _timer_map[obj->next_time].push_back(obj);
         }
         else
         {
@@ -63,12 +68,6 @@ void CRpcTimer::on_timer()
     }
 
     _timer_map.erase(itr);
-    if (!obj_list.empty())
-    {
-        auto &ref_list = _timer_map[_cur_timer + obj_list.front()->tick_time];
-        ref_list.splice(ref_list.begin(), obj_list);
-    }
-
     reset_timer();
 }
 
@@ -85,20 +84,13 @@ void CRpcTimer::reset_timer()
     }
 
     assert(!_timer_map.begin()->second.empty());
+    
+    uint64_t diff = 1;
+    if (_timer_map.begin()->first > _tick_timer)
+        diff = _timer_map.begin()->first - _tick_timer;
 
-    //秒 纳秒
-    uint64_t next_time = _timer_map.begin()->first;
-
-    //说明已经超时了，需要马上执行了
-    if (next_time <= _cur_timer)
-    {
-        crpc_log("not a good thing!!!\n");
-        on_timer();
-        return;
-    }
-
-    new_value.it_value.tv_sec = (next_time - _cur_timer) / 1000;
-    new_value.it_value.tv_nsec = ((next_time - _cur_timer) % 1000) * 1000000;
+    new_value.it_value.tv_sec = diff / 1000;
+    new_value.it_value.tv_nsec = (diff % 1000) * 1000000;
     timerfd_settime(_timer_fd, 0, &new_value, NULL);
 }
 
