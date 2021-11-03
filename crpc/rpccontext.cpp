@@ -4,14 +4,16 @@
 #include "crpc_log.h"
 #include "rpccontext.h"
 #include "crpc_server.h"
-#include "proto_rpc_controller.h"
 namespace crpc
 {
 
-RpcContext::RpcContext(int fd, EventLoop* loop):_loop(loop), _socket(fd),
-                                                      _con_status(CONTEXT_NORMAL),
-                                                      _proto(NULL),
-                                                      _ref_cnt(1)
+RpcContext::RpcContext(int fd, EventLoop* loop, poll_event* event): _loop(loop), 
+                                                                        _socket(fd),
+                                                                        _poll_event(event),
+                                                                        _con_status(CONTEXT_NORMAL),
+                                                                        _proto(NULL),
+                                                                        _proto_ctx(NULL),
+                                                                        _ref_cnt(1)
 {
     _socket.set_non_blocking();
 
@@ -30,19 +32,21 @@ RpcContext::~RpcContext()
     crpc_log("destroy context %p %d\n", this, _socket.fd());
     if (_proto)
         _proto->del_proto_ctx(_proto_ctx);
+    delete _poll_event;
     close(_socket.fd());
 }
 
 void RpcContext::context_read()
 {
-    while (true)
+    //TODO handle close / error event
+    while (true && (_con_status != CONTEXT_ERROR && _con_status != CONTEXT_CLOSE))
     {
         int len = _io_buf.read_fd(_socket.fd());
         //peer close
         if (len == 0)
         {
             crpc_log("peer close ! %p %d %d", this, _peer_port, _socket.fd());
-            _con_status |= DISABLE_READ;
+            _con_status |= CONTEXT_ERROR;
             break;
         }
         else if (len < 0)
@@ -53,7 +57,7 @@ void RpcContext::context_read()
             }
 
             crpc_log("not normal fd %d port %d read %d read %d write %d", _socket.fd(), _peer_port, errno, _io_buf.size(), _write_io_buf.size());
-            _con_status |= DISABLE_READ;
+            _con_status |= CONTEXT_ERROR;
             break;
         }
 
@@ -63,52 +67,64 @@ void RpcContext::context_read()
             _proto = select_proto(_io_buf);
             if (!_proto)
             {
-                crpc_log("select proto failed");
                 continue;
             }
-            _proto_ctx = _proto->alloc_proto_ctx();
+            _proto_ctx = _proto->alloc_proto_ctx(this);
         }
 
-        ParseResult result = _proto->proto_parse(&_io_buf, this);
-        if (result == NEED_NORE_DATA)
+        if(_proto->read_event(&_io_buf, this) == PARSE_FAILED)
         {
-            continue;
+            set_context_status(CONTEXT_CLOSE);
         }
-        else if (result == PARSE_FAILED)
-        {
-            _con_status |= CONTEX_ERROR;
-            break;
-        }
-
-        _proto->proto_process(this);
-        _proto->proto_finished(this);
     }
 }
 
-void RpcContext::trigger_response(ProtoRpcController* con)
+void RpcContext::context_write(const char *data, int size)
 {
-    _proto->proto_response(con, this, &_write_io_buf);
-    //write out?
-    context_write();
+    //出错不再写入了
+    if (_con_status == CONTEXT_ERROR)
+        return;
 
-    //may has request wait? just for test
-    context_read();
-}
-
-void RpcContext::context_write()
-{
-    while (true)
+    if (_write_io_buf.size() == 0)
     {
-        if (!_write_io_buf.size())
-            return;
-        if (_write_io_buf.write_fd(_socket.fd(), _write_io_buf.size()) <= 0)
+        //just write
+        int write_size = write(_socket.fd(), data, size);
+        if (write_size < -1 && errno != EAGAIN)
         {
-            if (errno != EAGAIN)
-            {
-                crpc_log("abnormal fd %d errno %d", _socket.fd(), errno);
-                _con_status |= CONTEX_ERROR;
-            }
-            break;
+            //error handle
+            _con_status = CONTEXT_ERROR;
+            return;
+        }
+
+        //write not full
+        int left = size - write_size;
+        if (left)
+        {
+            _write_io_buf.append(&data[write_size], left);
+            enable_write();
+        }
+        else
+        {
+            //add to loop for next_call
+            _loop->run_in_loop(std::bind(&Protocol::write_event, _proto, this));
+        }
+    }
+    else
+    {
+        //handle _write_io_buf first
+        flush_write_buf();
+        if (_con_status == CONTEXT_ERROR)
+            return;
+
+        if (!_write_io_buf.empty())
+        {
+            _write_io_buf.append(data, size);
+            enable_write();
+        }
+        else
+        {
+            //call recursive
+            context_write(data, size);
         }
     }
 }
@@ -116,32 +132,54 @@ void RpcContext::context_write()
 void RpcContext::context_close()
 {
     crpc_log("loop remove fd %d", _socket.fd());
-    _loop->remove_fd(_socket.fd());
+    _loop->remove_fd(_poll_event->fd);
 }
 
-void RpcContext::handle_event(uint32_t event)
+void RpcContext::handle_event(poll_event *event)
 {
-    _event = event;
-    //read ?
-    if (CAN_READ(_con_status) && _event & (EPOLLIN | EPOLLERR | EPOLLHUP))
+    if (CONTEXT_NORMAL == _con_status)
     {
-        context_read();
+        //read
+        if (event->event & (EPOLLIN | EPOLLERR | EPOLLHUP))
+        {
+            context_read();
+        }
+
+        //write
+        if (event->event & (EPOLLOUT | EPOLLERR | EPOLLHUP))
+        {
+            flush_write_buf();
+        }
     }
 
-    //write ?
-    if (CAN_WRITE(_con_status) && _event & (EPOLLOUT | EPOLLERR | EPOLLHUP))
+    //read / write 都有可能改变状态
+    if (CONTEXT_ERROR == _con_status)
     {
-        context_write();
-    }
-
-    _event = 0;
-    //case1:读被关闭了 && 本地已经写完了数据
-    //case2:写关闭了?
-    if ((!CAN_READ(_con_status) && _write_io_buf.size() == 0) ||
-        !CAN_WRITE(_con_status) || STATUS_ERROR(_con_status))
-    {
-        crpc_log("emit close %d %u", _con_status, _write_io_buf.size());
+        //直接关闭
         context_close();
+    }
+    else if (CONTEXT_CLOSE == _con_status)
+    {
+
+        if (_write_io_buf.size() == 0)
+        {
+            //没有要写的数据了
+           context_close();
+        }
+    }
+}
+
+void RpcContext::flush_write_buf()
+{
+    //没有buf可写
+    if (_write_io_buf.empty() && has_write_interest())
+    {
+        disable_write();
+    }
+
+    if (_write_io_buf.write_fd(_socket.fd(), _write_io_buf.size()) < 0 && errno != EAGAIN)
+    {
+        set_context_status(CONTEXT_ERROR);
     }
 }
 

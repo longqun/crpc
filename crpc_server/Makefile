@@ -15,7 +15,7 @@ CC      := g++
 LIBS    := -lprotobuf -lcrpc -lpthread
 LDFLAGS := -L../crpc
 DEFINES :=
-INCLUDE := -I. -I..
+INCLUDE := -I. -I../crpc
 CFLAGS  := -g -Wall -O3 $(DEFINES) $(INCLUDE) -std=c++11 
 CXXFLAGS:= $(CFLAGS) -DHAVE_CONFIG_H
 

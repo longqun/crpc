@@ -32,14 +32,6 @@ public:
 
     void start(const ServerOption& option);
 
-    void add_service(::google::protobuf::Service* service);
-
-    void add_http_service(::google::protobuf::Service* service, const std::string& url_path, const std::string& method);
-
-    void timer_run_at(int time, EventLoop* loop, const functor & func);
-
-    void timer_run_every(int time, EventLoop* loop, const functor & func);
-
     EventLoop* get_main_loop()
     {
         return &_main_loop;
@@ -49,7 +41,7 @@ private:
 
     void run();
 
-    void handle_acceptor(int accept_fd, int event);
+    void handle_acceptor(poll_event *event);
 
     EventLoop* get_next_loop();
 
@@ -59,7 +51,7 @@ private:
     Acceptor _acceptor;
 
     //work related
-    int _work_q_size;
+    size_t _work_q_size;
 
     //for thread wait notify
     std::vector<WorkThread*> _thread;

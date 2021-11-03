@@ -10,8 +10,8 @@
 namespace crpc
 {
 
-typedef std::function<void (int fd)> fd_create_cb;
-typedef std::function<void (int fd, int event)> fd_event_cb;
+typedef std::function<void (poll_event *event)> fd_create_cb;
+typedef std::function<void (poll_event *event)> fd_event_cb;
 typedef std::function<void (int fd)> fd_close_cb;
 
 
@@ -32,6 +32,8 @@ public:
 
     //只能在loop所在线程调用
     void remove_fd(int fd);
+
+    void mod_fd_event(int fd, int event);
 
     //当有新的fd加入poll会调用
     void reg_fd_create_cb(const fd_create_cb& cb)
@@ -54,12 +56,6 @@ public:
     //将fun移入到loop执行
     void run_in_loop(const functor& fun)
     {
-        if (is_in_loop_thread())
-        {
-            fun();
-            return;
-        }
-
         {
             MutexGuard guard(_pending_mutex);
             _pending_functors.push_back(fun);
@@ -71,6 +67,11 @@ public:
     void run_at(int time, const functor& func);
 
     void run_every(int time, const functor& func);
+
+    EPoller &get_poll()
+    {
+        return _poller;
+    }
 
 private:
 
@@ -93,7 +94,7 @@ private:
     //当要close fd之前会触发
     fd_close_cb _fd_close_del;
 
-    int _wake_fd;
+    poll_event _wake_event;
     bool _stop;
 
     Mutex _pending_mutex;
@@ -103,6 +104,7 @@ private:
 
     pthread_t _loop_thread_id;
 
+    poll_event _timer_event;
     CRpcTimer _timer;
 
 };

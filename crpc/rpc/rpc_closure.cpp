@@ -20,7 +20,7 @@ void CRpcClosure::run_internal()
     //fill data
     if (_cb)
         _cb();
-    _controller->get_context()->trigger_response(_controller);
+
     delete this;
 }
 

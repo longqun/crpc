@@ -22,7 +22,7 @@ void WorkThread::run_internal()
     RpcContextManager manager(_loop);
     _loop->reg_fd_create_cb(std::bind(&RpcContextManager::add_context, &manager, std::placeholders::_1));
     _loop->reg_fd_close_cb(std::bind(&RpcContextManager::remove_context, &manager, std::placeholders::_1));
-    _loop->reg_fd_event_cb(std::bind(&RpcContextManager::handle_context_event, &manager, std::placeholders::_1, std::placeholders::_2));
+    _loop->reg_fd_event_cb(std::bind(&RpcContextManager::handle_context_event, &manager, std::placeholders::_1));
     _loop->run();
     _latch->count_down();
 }

@@ -7,7 +7,6 @@
 #include "non_copy.h"
 #include "rpcmeta.pb.h"
 #include "common_header.h"
-#include "proto_rpc_controller.h"
 #include "google/protobuf/service.h"
 #include "google/protobuf/stubs/common.h"
 #include "trie.h"
@@ -41,13 +40,11 @@ class RpcService : NonCopy
 public:
     static RpcService* get_instance();
 
-    void add_service(::google::protobuf::Service* service);
-
-    void add_http_service(::google::protobuf::Service* service, const std::string& url, const std::string& method);
+    void register_rpc_service(::google::protobuf::Service* service);
 
     CallMessage get_call_msg(const std::string& service_name, const std::string& method);
 
-    ::google::protobuf::Service* get_service(const std::string& service)
+    ::google::protobuf::Service* get_rpc_service(const std::string& service)
     {
         if (_services.find(service) == _services.end())
             return NULL;
@@ -60,17 +57,10 @@ private:
     RpcService();
     static void create_instance();
     std::unordered_map<std::string, service_info> _services;
-
-    //http url -> service_name & method
-    std::unordered_map<std::string, std::pair<std::string, std::string>> _url_to_service_map;
-    Trie<char, std::string> _trie;
-
 };
 
-#define add_rpc_service(service) RpcService::get_instance()->add_service(service)
-#define add_rpc_http_service(service, service_name, method) RpcService::get_instance()->add_http_service(service, service_name, method)
-#define get_rpc_service(name) RpcService::get_instance()->get_service(name)
-//#define get_service_method_pair(url) RpcService::get_instance()->get_service_method_pair(url)
+#define REG_RPC_SERVICE(service) RpcService::get_instance()->register_rpc_service(service)
+#define GET_RPC_SERVICE(name) RpcService::get_instance()->get_rpc_service(name)
 
 }
 

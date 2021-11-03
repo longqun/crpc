@@ -77,30 +77,26 @@ public:
     ~RpcProtocol()
     {}
 
+     //读事件
+    ParseResult read_event(IoBuf* in, RpcContext* context);
+
+    //写事件
+    ParseResult write_event(RpcContext* context);
+
     //协议匹配
-    virtual ParseResult proto_match(IoBuf* io_buf);
+    ParseResult proto_match(IoBuf* in);
 
     //创建协议所需要的context
-    virtual void *alloc_proto_ctx();
+    void *alloc_proto_ctx(RpcContext* context);
 
     //移除创建的context
-    virtual void del_proto_ctx(void *context);
-
-    //协议解析
-    virtual ParseResult proto_parse(IoBuf* io_buf, RpcContext* context);
-
-    //回调函数
-    virtual void proto_process(RpcContext* context);
-
-    //协议回复数据
-    virtual void proto_response(ProtoRpcController* con, RpcContext* context, IoBuf* io_buf);
-
-    //协议回复数据完成回调，可以用来重置ctx状态。
-    virtual void proto_finished(RpcContext* context);
-
+    void del_proto_ctx(void *context);
 
 private:
-    void invoke_user_cb(RpcContext* context);
+
+    void reset(RpcContext *);
+
+    ParseResult invoke_user_cb(RpcContext* context);
     void fill_reply_data(::google::protobuf::Message* req_msg, ::google::protobuf::Message* resp_msg, RpcContext *ctx);
 
 };

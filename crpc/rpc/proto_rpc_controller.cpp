@@ -4,16 +4,23 @@
 namespace crpc
 {
 
-ProtoRpcController::ProtoRpcController(RpcContext* context, HttpRequestParser* req):_context(context)
+ProtoRpcController::ProtoRpcController(RpcContext* context):_context(context)
 {
-    if (req)
-        _http_req_parse = std::move(*req);
-    _context->add_ref();
+    //禁止读事件
+    if (context)
+    {
+        _context->add_ref();
+    }
 }
 
 ProtoRpcController::~ProtoRpcController()
 {
-    _context->dec_ref();
+    //触发本次读事件
+    if (_context)
+    {
+        _context->dec_ref();
+    }
+
 }
 
 EventLoop* ProtoRpcController::get_runing_loop()

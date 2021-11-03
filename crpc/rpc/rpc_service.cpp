@@ -19,7 +19,6 @@ void RpcService::create_instance()
 
 RpcService::RpcService()
 {
-
 }
 
 CallMessage RpcService::get_call_msg(const std::string& service_name, const std::string& method)
@@ -33,7 +32,7 @@ CallMessage RpcService::get_call_msg(const std::string& service_name, const std:
     return CallMessage(true, md, service->GetRequestPrototype(md).New(), service->GetResponsePrototype(md).New());
 }
 
-void RpcService::add_service(::google::protobuf::Service * service)
+void RpcService::register_rpc_service(::google::protobuf::Service * service)
 {
     service_info ser_info;
     ser_info.service = service;
@@ -44,26 +43,6 @@ void RpcService::add_service(::google::protobuf::Service * service)
     }
 
     _services[ser_info.sd->name()] = ser_info;
-}
-
-std::pair<std::string, std::string> RpcService::get_service_method_pair(const std::string& url)
-{
-    std::string fit_url;
-    if (!_trie.find_prefix(url.c_str(), url.size(), fit_url))
-    {
-        return std::pair<std::string, std::string>();
-    }
-
-    return _url_to_service_map[fit_url];
-}
-
-void RpcService::add_http_service(::google::protobuf::Service* service, const std::string& url, const std::string& 
-method)
-{
-    std::string service_name = service->GetDescriptor()->name();
-    add_service(service);
-    _url_to_service_map[url] = make_pair(service_name, method);
-    _trie.insert(url.c_str(), url.size(), url);
 }
 
 }

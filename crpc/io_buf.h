@@ -99,8 +99,6 @@ public:
 
     int copyn(void* out, int n);
 
-    void pop_n(int n);
-
     bool cut_crlf(std::string& str);
 
     void append(IoBuf* io_buf);
@@ -116,6 +114,11 @@ public:
     size_t size() const
     {
         return _buf_size;
+    }
+
+    bool empty() const
+    {
+        return size() == 0 ? true : false;
     }
 
     std::string to_string(int n);

@@ -28,16 +28,16 @@ public:
         _manger_map.clear();
     }
 
-    void add_context(int fd)
+    void add_context(poll_event *event)
     {
-        if (_manger_map.find(fd) != _manger_map.end())
+        if (_manger_map.find(event->fd) != _manger_map.end())
         {
-            crpc_log("add exist fd %d", fd);
+            crpc_log("add exist fd %d", event->fd);
             abort();
             return;
         }
 
-        _manger_map[fd] = new RpcContext(fd, _loop);
+        _manger_map[event->fd] = new RpcContext(event->fd, _loop, event);
     }
 
     void remove_context(int fd)
@@ -49,9 +49,9 @@ public:
         _manger_map.erase(fd);
     }
 
-    void handle_context_event(int fd, int event)
+    void handle_context_event(poll_event *event)
     {
-        auto itr = _manger_map.find(fd);
+        auto itr = _manger_map.find(event->fd);
         if (itr == _manger_map.end())
             return;
 

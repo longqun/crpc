@@ -228,11 +228,6 @@ bool IoBuf::cut_crlf(std::string& str)
     return found;
 }
 
-void IoBuf::pop_n(int n)
-{
-
-}
-
 int IoBuf::cutn(void * out, int n)
 {
     char* out_ptr = (char *)out;

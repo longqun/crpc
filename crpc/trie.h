@@ -1,6 +1,8 @@
 #ifndef CRPC_TRIE_H_
 #define CRPC_TRIE_H_
 
+#include <unordered_map>
+
 template <typename T, typename Value>
 class Trie
 {
@@ -82,12 +84,15 @@ public:
         }
 
 
+        //123445
+        //123
+
         //check valid
         if (!cur || !cur->is_word || cur->trie_map.size())
             return;
 
         cur = last_word->trie_map[buff[last_word_pos]];
-        last_word->erase(buff[last_word_pos]);
+        last_word->trie_map.erase(buff[last_word_pos]);
 
         remove_internal(cur);
     }

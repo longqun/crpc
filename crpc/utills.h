@@ -7,12 +7,15 @@
 #include <sys/timerfd.h>
 #include <fcntl.h>
 #include <stdint.h>
+#include <string>
 namespace crpc
 {
 
 void print_stacktrace();
 
 uint64_t get_timestamps_ms();
+
+std::string get_http_code_name(int http_code);
 
 }
 

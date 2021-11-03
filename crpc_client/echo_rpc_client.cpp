@@ -1,6 +1,6 @@
-#include "crpc/proto_rpc_controller.h"
+#include "rpc/proto_rpc_controller.h"
 #include "echo.pb.h"
-#include "crpc/rpc_channel.h"
+#include "rpc/rpc_channel.h"
 
 using namespace crpc;
 void* call_rpc(void *)
@@ -13,7 +13,7 @@ void* call_rpc(void *)
     request.set_msg("hello, myrpc.");
 
     echo::EchoService_Stub stub(&channel);
-    ProtoRpcController cntl(new RpcContext(-1, NULL));
+    ProtoRpcController cntl(NULL);
     while (true)
     {
         stub.Echo(&cntl, &request, &response, NULL);
@@ -28,7 +28,7 @@ void* call_rpc(void *)
 
 int main()
 {
-    for (size_t i = 0;i < 50; ++i)
+    for (size_t i = 0;i < 10; ++i)
     {
         pthread_t ntid;
         pthread_create(&ntid, NULL, call_rpc, NULL);

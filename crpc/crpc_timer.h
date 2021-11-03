@@ -38,6 +38,9 @@ public:
 
 private:
 
+    //获取定时器已经经过的时间
+    uint64_t get_tick_timer();
+
     void reset_timer();
 
     void update_timer(TimeObject* obj);

@@ -5,7 +5,6 @@
 #include <atomic>
 #include <string>
 #include "rpcmeta.pb.h"
-#include "proto_rpc_controller.h"
 #include "google/protobuf/service.h"
 #include "google/protobuf/stubs/common.h"
 #include "common_header.h"
@@ -22,9 +21,8 @@ namespace crpc {
 enum
 {
     CONTEXT_NORMAL = 0,
-    DISABLE_READ = 1,
-    DISABLE_WRITE = 2,
-    CONTEX_ERROR = 4
+    CONTEXT_CLOSE  = 1,
+    CONTEXT_ERROR = 2
 };
 
 #define CAN_READ(status) !(status & DISABLE_READ)
@@ -35,11 +33,11 @@ class RpcContext : NonCopy
 {
 public:
 
-    RpcContext(int fd, EventLoop* loop);
+    RpcContext(int fd, EventLoop* loop, poll_event *event);
 
     ~RpcContext();
 
-    void handle_event(uint32_t event);;
+    void handle_event(poll_event *event);
 
     int fd() const
     {
@@ -56,11 +54,11 @@ public:
         return _peer_ip;
     }
 
-    void set_context_close()
+    void set_context_status(int status)
     {
-        crpc_log("set close context");
-        //no read any more and try to send out data
-        _con_status |= DISABLE_READ;
+        if (status == CONTEXT_ERROR)
+            return;
+        _con_status = status;
     }
 
     EventLoop* get_context_loop()
@@ -80,9 +78,6 @@ public:
             delete this;
     }
 
-    //触发response
-    void trigger_response(ProtoRpcController* con);
-
     void set_proto_context(void *ptr)
     {
         _proto_ctx = ptr;
@@ -93,6 +88,54 @@ public:
         return _proto_ctx;
     }
 
+    bool has_write_interest() const
+    {
+        return _poll_event->event & EPOLLOUT;
+    }
+
+    bool has_read_interest() const
+    {
+        return _poll_event->event & EPOLLIN;
+    }
+
+    void enable_read()
+    {
+        if (has_read_interest())
+            return;
+
+        _poll_event->event |= EPOLLIN;
+        _loop->get_poll().mod_event(_poll_event);
+    }
+
+    void disable_read()
+    {
+         if (!has_read_interest())
+            return;
+
+        _poll_event->event &= ~EPOLLIN;
+        _loop->get_poll().mod_event(_poll_event);
+    }
+
+    void enable_write()
+    {
+        if (has_write_interest())
+            return;
+
+        _poll_event->event |= EPOLLOUT;
+        _loop->get_poll().mod_event(_poll_event);
+    }
+
+    void disable_write()
+    {
+        if (!has_write_interest())
+            return;
+
+        _poll_event->event &= ~EPOLLOUT;
+        _loop->get_poll().mod_event(_poll_event);
+    }
+
+    void context_write(const char *data, int size);
+
 private:
 
     //当要关闭的时候调用
@@ -101,16 +144,15 @@ private:
     //有读事件的时候调用
     void context_read();
 
-    //有写事件的时候调用
-    void context_write();
+    void flush_write_buf();
 
     EventLoop* _loop;
 
     //socket
     Socket _socket;
 
-    //本次触发的事件
-    uint32_t _event;
+    //当前fd在poll中感兴趣的事件 如EPOLLIN EPOLLOUT
+    poll_event *_poll_event;
 
     //读取 & 写入的 iobuf
     IoBuf _io_buf;

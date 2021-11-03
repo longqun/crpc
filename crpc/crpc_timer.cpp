@@ -10,11 +10,27 @@ struct TimeObject {
     bool repeated;
 };
 
+uint64_t CRpcTimer::get_tick_timer()
+{
+    if (_timer_map.empty())
+        return 0;
+
+    assert(!_timer_map.begin()->second.empty());
+    TimeObject* obj = _timer_map.begin()->second.front();
+
+    struct itimerspec curr_value;
+    timerfd_gettime(_timer_fd, &curr_value);
+
+    //assert(obj->tick_time >= curr_value.it_value);
+    return obj->tick_time - (curr_value.it_value.tv_sec * 1000 + curr_value.it_value.tv_nsec / 1000);
+}
+
 TimeObject* CRpcTimer::run_at(int time, const functor& func)
 {
     if (time <= 0)
         time = 1;
 
+    _tick_timer += get_tick_timer();
     TimeObject* obj = new TimeObject;
     obj->func = func;
     obj->next_time = _tick_timer + time;
@@ -30,6 +46,8 @@ TimeObject* CRpcTimer::run_every(int time, const functor& func)
 {
     if (time <= 0)
         time = 1;
+ 
+    _tick_timer += get_tick_timer();
     TimeObject* obj = new TimeObject;
     obj->func = func;
     obj->next_time = _tick_timer + time;

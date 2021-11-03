@@ -20,10 +20,17 @@ void read_all_fd(int fd)
     while (read(fd, buf, sizeof(buf)) > 0);
 }
 
-EventLoop::EventLoop():_wake_fd(createEventfd()), _stop(false)
+EventLoop::EventLoop(): _stop(false)
 {
-    _poller.add_fd(_wake_fd);
-    _poller.add_fd(_timer.fd());
+    _wake_event.fd = createEventfd();
+    _wake_event.event = EPOLLIN;
+
+    _timer_event.fd = _timer.fd();
+    _timer_event.event = EPOLLIN;
+
+    
+    _poller.add_event(&_wake_event);
+    _poller.add_event(&_timer_event);
 }
 
 void EventLoop::run()
@@ -37,9 +44,9 @@ void EventLoop::run()
         for (int i = 0; i < length; ++i)
         {
             int fd = event_vec[i].data.fd;
-            if (fd == _wake_fd)
+            if (fd == _wake_event.fd)
             {
-                read_all_fd(_wake_fd);
+                read_all_fd(_wake_event.fd);
                 continue;
             }
 
@@ -53,7 +60,7 @@ void EventLoop::run()
                 continue;
             }
 
-            _fd_event_cb(fd, event_vec[i].events);
+            _fd_event_cb((poll_event *)event_vec[i].data.ptr);
         }
 
         //call functors
@@ -86,13 +93,15 @@ void EventLoop::stop()
 void EventLoop::wake_up()
 {
     uint64_t i = 1;
-    ::write(_wake_fd, &i, sizeof(uint64_t));
+    ::write(_wake_event.fd, &i, sizeof(uint64_t));
 }
 
 void EventLoop::remove_fd(int fd)
 {
     crpc_log("remove fd %d", fd);
-    _poller.del_fd(fd);
+    poll_event event;
+    event.fd = fd;
+    _poller.del_event(&event);
     if (_fd_close_del)
         _fd_close_del(fd);
 }
@@ -100,9 +109,13 @@ void EventLoop::remove_fd(int fd)
 bool EventLoop::add_fd(int fd)
 {
     crpc_log("add fd %d", fd);
-    _poller.add_fd(fd);
+    poll_event *event = new poll_event;
+    event->event = EPOLLIN;
+    event->fd = fd;
+
+    _poller.add_event(event);
     if (_fd_create_cb)
-        _fd_create_cb(fd);
+        _fd_create_cb(event);
     return true;
 }
 

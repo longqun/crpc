@@ -13,26 +13,31 @@ namespace crpc
 {
 int createEventfd();
 
+
+struct poll_event
+{
+    int fd;
+    int event;
+
+    poll_event():fd(-1), event(0)
+    {}
+};
+
 class EPoller
 {
 public:
     EPoller();
-    int add_fd(int fd);
+    int add_event(poll_event *event);
 
-    int del_fd(int fd);
+    int del_event(poll_event *event);
 
-    int mod_fd(int fd, int event);
+    int mod_event(poll_event *event);
 
     int poll();
 
     std::vector<struct epoll_event>& get_event_vec()
     {
         return _event_vec;
-    }
-
-    int poll_fd() const
-    {
-        return _poll_fd;
     }
 
 private:
