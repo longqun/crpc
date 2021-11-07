@@ -11,6 +11,10 @@
 namespace crpc
 {
 
+void read_all_fd(int fd);
+
+int createEventfd();
+
 void print_stacktrace();
 
 uint64_t get_timestamps_ms();

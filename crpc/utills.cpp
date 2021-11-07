@@ -1,4 +1,6 @@
 #include <unordered_map>
+#include <sys/eventfd.h>
+#include <unistd.h>
 #include "utills.h"
 
 namespace crpc
@@ -75,5 +77,22 @@ uint64_t get_timestamps_ms()
     uint64_t ret = current.tv_sec * 1000 + current.tv_usec / 1000;
     return ret;
 }
+
+int createEventfd()
+{
+    int evtfd = ::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+    if (evtfd < 0)
+    {
+        abort();
+    }
+    return evtfd;
+}
+
+void read_all_fd(int fd)
+{
+    char buf[4096];
+    while (read(fd, buf, sizeof(buf)) > 0);
+}
+
 
 }

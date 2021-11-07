@@ -39,6 +39,8 @@ public:
 
 private:
 
+    void stop();
+
     void run();
 
     void handle_acceptor(poll_event *event);
@@ -49,6 +51,7 @@ private:
 
     //poller related
     Acceptor _acceptor;
+    poll_event _accept_event;
 
     //work related
     size_t _work_q_size;
@@ -59,6 +62,9 @@ private:
 
     //service
     ServerOption _option;
+
+    //wake
+    poll_event _wake_event;
 
     EventLoop _main_loop;
 

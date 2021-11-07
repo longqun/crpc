@@ -19,7 +19,7 @@ ParseResult RpcProtocol::proto_match(IoBuf* io_buf)
     return PARSE_FAILED;
 }
 
-void *RpcProtocol::alloc_proto_ctx(RpcContext* context)
+void *RpcProtocol::alloc_proto_ctx(RpcContext *)
 {
     RpcProtocolContext *ctx = new RpcProtocolContext;
     ctx->_header.reset();
@@ -27,7 +27,7 @@ void *RpcProtocol::alloc_proto_ctx(RpcContext* context)
     return ctx;
 }
 
-     //读事件
+//读事件
  ParseResult RpcProtocol::read_event(IoBuf* in, RpcContext* context)
 {
     RpcProtocolContext *ctx = (RpcProtocolContext *)context->get_proto_context();
@@ -93,7 +93,7 @@ void *RpcProtocol::alloc_proto_ctx(RpcContext* context)
 }
 
 //针对rpc来说目前实现都是一次性写完。后续有大数据要传输再实现异步传输
-ParseResult RpcProtocol::write_event(RpcContext* context)
+ParseResult RpcProtocol::write_event(RpcContext*)
 {
     return PARSE_SUCCESS;
 }

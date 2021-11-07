@@ -7,9 +7,14 @@
 namespace crpc
 {
 
-RpcContext::RpcContext(int fd, EventLoop* loop, poll_event* event): _loop(loop), 
+#define WRAP_BIND(cb)                                                                       \
+    do {                                                                                    \
+        add_ref();                                                                          \
+        _loop->queue_in_loop(std::bind(&RpcContext::context_call_wrap, this, cb));          \
+    } while(0)
+
+RpcContext::RpcContext(int fd, EventLoop* loop): _loop(loop), 
                                                                         _socket(fd),
-                                                                        _poll_event(event),
                                                                         _con_status(CONTEXT_NORMAL),
                                                                         _proto(NULL),
                                                                         _proto_ctx(NULL),
@@ -32,8 +37,8 @@ RpcContext::~RpcContext()
     crpc_log("destroy context %p %d\n", this, _socket.fd());
     if (_proto)
         _proto->del_proto_ctx(_proto_ctx);
-    delete _poll_event;
     close(_socket.fd());
+    delete _poll_event;
 }
 
 void RpcContext::context_read()
@@ -79,6 +84,13 @@ void RpcContext::context_read()
     }
 }
 
+//包装一下异步调用
+void RpcContext::context_call_wrap(const functor &cb)
+{
+    cb();
+    dec_ref();
+}
+
 void RpcContext::context_write(const char *data, int size)
 {
     //出错不再写入了
@@ -106,13 +118,14 @@ void RpcContext::context_write(const char *data, int size)
         else
         {
             //add to loop for next_call
-            _loop->run_in_loop(std::bind(&Protocol::write_event, _proto, this));
+            functor f = std::bind(&Protocol::write_event, _proto, this);
+            WRAP_BIND(f);
         }
     }
     else
     {
         //handle _write_io_buf first
-        flush_write_buf();
+        context_write();
         if (_con_status == CONTEXT_ERROR)
             return;
 
@@ -131,45 +144,10 @@ void RpcContext::context_write(const char *data, int size)
 
 void RpcContext::context_close()
 {
-    crpc_log("loop remove fd %d", _socket.fd());
-    _loop->remove_fd(_poll_event->fd);
+    dec_ref();
 }
 
-void RpcContext::handle_event(poll_event *event)
-{
-    if (CONTEXT_NORMAL == _con_status)
-    {
-        //read
-        if (event->event & (EPOLLIN | EPOLLERR | EPOLLHUP))
-        {
-            context_read();
-        }
-
-        //write
-        if (event->event & (EPOLLOUT | EPOLLERR | EPOLLHUP))
-        {
-            flush_write_buf();
-        }
-    }
-
-    //read / write 都有可能改变状态
-    if (CONTEXT_ERROR == _con_status)
-    {
-        //直接关闭
-        context_close();
-    }
-    else if (CONTEXT_CLOSE == _con_status)
-    {
-
-        if (_write_io_buf.size() == 0)
-        {
-            //没有要写的数据了
-           context_close();
-        }
-    }
-}
-
-void RpcContext::flush_write_buf()
+void RpcContext::context_write()
 {
     //没有buf可写
     if (_write_io_buf.empty() && has_write_interest())
@@ -181,6 +159,45 @@ void RpcContext::flush_write_buf()
     {
         set_context_status(CONTEXT_ERROR);
     }
+}
+
+void RpcContext::context_handle(bool is_read)
+{
+    if (is_read)
+        context_read();
+    else
+        context_write();
+
+    context_status();
+}
+
+void RpcContext::context_status()
+{
+    if (_con_status == CONTEXT_CLOSE || _con_status == CONTEXT_ERROR)
+    {
+        if (_poll_event->stop)
+            return;
+
+        //标志位，关闭的标志位，避免重入
+        _poll_event->stop = true;
+        
+        crpc_log("loop remove fd %d", _socket.fd());
+
+        //引用计数
+        functor f = std::bind(&EventLoop::remove_poll_event, _loop, _poll_event);
+        WRAP_BIND(f);
+    }
+}
+
+void RpcContext::on_rpc_context_init()
+{
+    _poll_event = new poll_event;
+    _poll_event->fd = _socket.fd();
+    _poll_event->event = EPOLLIN;
+    _poll_event->read_cb = std::bind(&RpcContext::context_handle, this, true);
+    _poll_event->write_cb = std::bind(&RpcContext::context_handle, this, false);
+    _poll_event->close_cb = std::bind(&RpcContext::context_close, this);
+    _loop->add_poll_event(_poll_event);
 }
 
 }

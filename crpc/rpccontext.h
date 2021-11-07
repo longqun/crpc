@@ -33,16 +33,9 @@ class RpcContext : NonCopy
 {
 public:
 
-    RpcContext(int fd, EventLoop* loop, poll_event *event);
+    RpcContext(int fd, EventLoop* loop);
 
     ~RpcContext();
-
-    void handle_event(poll_event *event);
-
-    int fd() const
-    {
-        return _socket.fd();
-    }
 
     int get_peer_port() const
     {
@@ -64,18 +57,6 @@ public:
     EventLoop* get_context_loop()
     {
         return _loop;
-    }
-
-    void add_ref()
-    {
-        ++_ref_cnt;
-    }
-
-    void dec_ref()
-    {
-        --_ref_cnt;
-        if (_ref_cnt <= 0)
-            delete this;
     }
 
     void set_proto_context(void *ptr)
@@ -136,7 +117,28 @@ public:
 
     void context_write(const char *data, int size);
 
+    void on_rpc_context_init();
+
+    void add_ref()
+    {
+        ++_ref_cnt;
+    }
+
+    void dec_ref()
+    {
+        --_ref_cnt;
+        if (_ref_cnt <= 0)
+            delete this;
+    }
 private:
+
+    void context_call_wrap(const functor &cb);
+
+    void context_status();
+
+    void context_handle(bool is_read);
+
+    void context_write();
 
     //当要关闭的时候调用
     void context_close();

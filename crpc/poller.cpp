@@ -10,16 +10,26 @@ EPoller::EPoller():_poll_fd(epoll_create(s_epoll_size)),    _event_vec(s_epoll_s
 
 int EPoller::add_event(poll_event *event)
 {
+
+    assert(_fd_event_map.find(event->fd) == _fd_event_map.end());
+
     struct epoll_event ev;
     ev.events = event->event | EPOLLET;
     ev.data.fd = event->fd;
     ev.data.ptr = event;
+
+    _fd_event_map[event->fd] = event;
     return epoll_ctl(_poll_fd, EPOLL_CTL_ADD, event->fd, &ev);
 }
 
 int EPoller::del_event(poll_event *event)
 {
-    return epoll_ctl(_poll_fd, EPOLL_CTL_DEL, event->fd, NULL);
+    int fd = event->fd;
+    _fd_event_map.erase(event->fd);
+    //执行close后有可能event被析构掉了
+    if (event->close_cb)
+        event->close_cb();
+    return epoll_ctl(_poll_fd, EPOLL_CTL_DEL, fd, NULL);
 }
 
 int EPoller::mod_event(poll_event *event)
